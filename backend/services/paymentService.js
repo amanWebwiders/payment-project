@@ -76,6 +76,67 @@ class PaymentService {
       throw { message: 'Confirm payment error', details: error };
     }
   }
+
+  // Handle Stripe webhooks
+  async handleStripeWebhook(body, signature) {
+    try {
+      if (!stripe) {
+        throw new Error('Stripe is not configured');
+      }
+
+      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      let event;
+
+      if (webhookSecret) {
+        // Verify webhook signature
+        event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      } else {
+        // For testing without webhook secret
+        event = JSON.parse(body);
+      }
+
+      // Handle the event
+      switch (event.type) {
+        case 'checkout.session.completed':
+          const session = event.data.object;
+          await this.updateOrderStatusBySessionId(session.id, 'paid');
+          console.log('Payment succeeded for session:', session.id);
+          break;
+
+        case 'checkout.session.expired':
+          const expiredSession = event.data.object;
+          await this.updateOrderStatusBySessionId(expiredSession.id, 'canceled');
+          console.log('Payment expired for session:', expiredSession.id);
+          break;
+
+        default:
+          console.log(`Unhandled event type ${event.type}`);
+      }
+
+      return { received: true };
+    } catch (error) {
+      console.error('Webhook Error:', error);
+      throw error;
+    }
+  }
+
+  // Update order status by session ID
+  async updateOrderStatusBySessionId(sessionId, status = 'paid') {
+    try {
+      const order = await paymentRepository.findOrderByTransactionId(sessionId);
+      if (order) {
+        await paymentRepository.updateOrderStatus(order.id, status, sessionId);
+        console.log(`Updated order ${order.id} status to ${status}`);
+        return order;
+      } else {
+        console.log(`Order not found for session ${sessionId}`);
+        return null;
+      }
+    } catch (error) {
+      console.error('Status Update Error:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new PaymentService();

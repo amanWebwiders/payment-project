@@ -24,6 +24,30 @@ const paymentController = {
       res.status(500).json({ success: false, error });
     }
   },
+
+  // Stripe webhook handler
+  async handleWebhook(req, res) {
+    try {
+      const sig = req.headers['stripe-signature'];
+      const result = await paymentService.handleStripeWebhook(req.body, sig);
+      res.json({ received: true });
+    } catch (error) {
+      console.error('Webhook Error:', error);
+      res.status(400).json({ error: error.message });
+    }
+  },
+
+  // Manual status update for success page
+  async updateOrderStatus(req, res) {
+    try {
+      const { sessionId } = req.body;
+      const result = await paymentService.updateOrderStatusBySessionId(sessionId);
+      res.json({ success: true, order: result });
+    } catch (error) {
+      console.error('Status Update Error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
 };
 
 module.exports = paymentController;

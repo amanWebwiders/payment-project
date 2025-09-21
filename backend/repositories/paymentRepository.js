@@ -25,6 +25,28 @@ class PaymentRepository {
       throw { message: 'DB error', details: error };
     }
   }
+
+  async findOrderByTransactionId(transactionId) {
+    try {
+      const order = await Order.findOne({
+        where: { transaction_id: transactionId }
+      });
+      return order;
+    } catch (error) {
+      console.error('Repository Error:', error);
+      throw { message: 'DB error', details: error };
+    }
+  }
+
+  async findOrderById(id) {
+    try {
+      const order = await Order.findByPk(id);
+      return order;
+    } catch (error) {
+      console.error('Repository Error:', error);
+      throw { message: 'DB error', details: error };
+    }
+  }
 }
 
 module.exports = new PaymentRepository();
